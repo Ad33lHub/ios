@@ -1,306 +1,33 @@
-// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-// import 'package:timezone/timezone.dart' as tz;
-// import 'package:timezone/data/latest.dart' as tz;
-// import '../models/task.dart';
-
-// class NotificationService {
-//   static final NotificationService instance = NotificationService._init();
-//   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
-//   bool _isInitialized = false;
-
-//   NotificationService._init();
-
-//   Future<void> _ensureInitialized() async {
-//     if (_isInitialized) return;
-    
-//     tz.initializeTimeZones();
-//     // Use local timezone
-//     final location = tz.local;
-//     tz.setLocalLocation(location);
-
-//     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-//     const iosSettings = DarwinInitializationSettings(
-//       requestAlertPermission: true,
-//       requestBadgePermission: true,
-//       requestSoundPermission: true,
-//     );
-
-//     const initSettings = InitializationSettings(
-//       android: androidSettings,
-//       iOS: iosSettings,
-//     );
-
-//     await _notifications.initialize(
-//       initSettings,
-//       onDidReceiveNotificationResponse: _onNotificationTapped,
-//     );
-
-//     // Request permissions for Android 13+
-//     await _requestPermissions();
-//     _isInitialized = true;
-//   }
-
-//   Future<void> _requestPermissions() async {
-//     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-//         AndroidFlutterLocalNotificationsPlugin>();
-//     if (androidPlugin != null) {
-//       await androidPlugin.requestNotificationsPermission();
-//     }
-//   }
-
-//   void _onNotificationTapped(NotificationResponse response) {
-//     // Handle notification tap
-//     // You can navigate to task details here if needed
-//   }
-
-//   Future<void> _scheduleFiveMinuteReminder(Task task, DateTime dueDateTime, int notificationId) async {
-//     if (dueDateTime.isBefore(DateTime.now())) return;
-
-//     final reminderTime = dueDateTime.subtract(const Duration(minutes: 5));
-//     if (reminderTime.isBefore(DateTime.now())) return;
-
-//     final androidDetails = AndroidNotificationDetails(
-//       'task_reminder_channel',
-//       'Task Reminders',
-//       channelDescription: 'Urgent reminders for tasks due in 5 minutes',
-//       importance: Importance.high,
-//       priority: Priority.high,
-//       icon: '@mipmap/ic_launcher',
-//       enableVibration: true,
-//       playSound: true,
-//       visibility: NotificationVisibility.public, // Show on lock screen
-//       fullScreenIntent: true, // This will show as a heads-up notification
-//       category: AndroidNotificationCategory.alarm,
-//     );
-
-//     const iosDetails = DarwinNotificationDetails(
-//       presentAlert: true,
-//       presentBadge: true,
-//       presentSound: true,
-//       interruptionLevel: InterruptionLevel.timeSensitive, // High priority on iOS
-//     );
-
-//     final notificationDetails = NotificationDetails(
-//       android: androidDetails,
-//       iOS: iosDetails,
-//     );
-
-//     await _notifications.zonedSchedule(
-//       notificationId + 1000, // Use different ID for reminder
-//       '⚠️ Task Due in 5 Minutes!',
-//       '${task.title} needs to be completed soon',
-//       tz.TZDateTime.from(reminderTime, tz.local),
-//       notificationDetails,
-//       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-//       uiLocalNotificationDateInterpretation:
-//           UILocalNotificationDateInterpretation.absoluteTime,
-//     );
-//   }
-
-//   Future<void> scheduleTaskNotification(Task task) async {
-//     await _ensureInitialized();
-    
-//     try {
-//       if (task.dueDate.isBefore(DateTime.now()) && task.repeatType == 'none') {
-//         return; // Don't schedule notifications for past tasks
-//       }
-
-//       final notificationId = task.notificationId ?? (task.id ?? 0);
-//       final dueDateTime = task.dueTime ?? DateTime(
-//         task.dueDate.year,
-//         task.dueDate.month,
-//         task.dueDate.day,
-//         9, // Default to 9 AM if no time specified
-//       );
-
-//       // Schedule the 5-minute reminder notification
-//       await _scheduleFiveMinuteReminder(task, dueDateTime, notificationId);
-
-//       final androidDetails = AndroidNotificationDetails(
-//         'task_channel',
-//         'Task Notifications',
-//         channelDescription: 'Notifications for upcoming tasks',
-//         importance: Importance.high,
-//         priority: Priority.high,
-//         icon: '@mipmap/ic_launcher',
-//         enableVibration: true,
-//         playSound: true,
-//       );
-
-//       const iosDetails = DarwinNotificationDetails(
-//         presentAlert: true,
-//         presentBadge: true,
-//         presentSound: true,
-//       );
-
-//       final notificationDetails = NotificationDetails(
-//         android: androidDetails,
-//         iOS: iosDetails,
-//       );
-
-//       final now = tz.TZDateTime.now(tz.local);
-//       final scheduledDate = tz.TZDateTime.from(dueDateTime, tz.local);
-
-//       if (task.repeatType == 'daily') {
-//         // For daily notifications, schedule the next occurrence
-//         // Note: This schedules for the next day only
-//         // For true daily repeats, consider rescheduling after notification fires
-//         var nextDate = scheduledDate;
-//         if (!nextDate.isAfter(now)) {
-//           // If time has passed today, schedule for tomorrow at the same time
-//           nextDate = tz.TZDateTime(
-//             tz.local,
-//             now.year,
-//             now.month,
-//             now.day,
-//             scheduledDate.hour,
-//             scheduledDate.minute,
-//           ).add(const Duration(days: 1));
-//         }
-        
-//         // Schedule the notification
-//         await _notifications.zonedSchedule(
-//           notificationId,
-//           task.title,
-//           task.description,
-//           nextDate,
-//           notificationDetails,
-//           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-//           uiLocalNotificationDateInterpretation:
-//               UILocalNotificationDateInterpretation.absoluteTime,
-//         );
-//       } else if (task.repeatType == 'weekly' && task.repeatDays != null) {
-//         // For weekly tasks, schedule for each selected day
-//         final days = _parseRepeatDays(task.repeatDays!);
-//         for (final day in days) {
-//           await _scheduleWeeklyNotification(
-//             notificationId + day,
-//             task,
-//             day,
-//             dueDateTime,
-//             notificationDetails,
-//           );
-//         }
-//       } else {
-//         // One-time notification
-//         if (scheduledDate.isAfter(now)) {
-//           await _notifications.zonedSchedule(
-//             notificationId,
-//             task.title,
-//             task.description,
-//             scheduledDate,
-//             notificationDetails,
-//             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-//             uiLocalNotificationDateInterpretation:
-//                 UILocalNotificationDateInterpretation.absoluteTime,
-//           );
-//         }
-//       }
-//     } catch (e) {
-//       // Log error but don't throw - allow task to be saved even if notification fails
-//       // Error is handled in the calling code
-//       rethrow; // Re-throw so calling code can handle it appropriately
-//     }
-//   }
-
-//   Future<void> _scheduleWeeklyNotification(
-//     int id,
-//     Task task,
-//     int dayOfWeek,
-//     DateTime dueDateTime,
-//     NotificationDetails details,
-//   ) async {
-//     final now = tz.TZDateTime.now(tz.local);
-//     final scheduledDate = _getNextWeekday(now, dayOfWeek, dueDateTime);
-
-//     if (scheduledDate.isAfter(now)) {
-//       await _notifications.zonedSchedule(
-//         id,
-//         task.title,
-//         task.description,
-//         scheduledDate,
-//         details,
-//         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-//         uiLocalNotificationDateInterpretation:
-//             UILocalNotificationDateInterpretation.absoluteTime,
-//         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-//       );
-//     }
-//   }
-
-//   tz.TZDateTime _getNextWeekday(tz.TZDateTime now, int dayOfWeek, DateTime dueTime) {
-//     var next = tz.TZDateTime(
-//       tz.local,
-//       now.year,
-//       now.month,
-//       now.day,
-//       dueTime.hour,
-//       dueTime.minute,
-//     );
-
-//     final currentDay = now.weekday;
-//     final daysUntilNext = (dayOfWeek - currentDay) % 7;
-    
-//     if (daysUntilNext == 0 && next.isBefore(now)) {
-//       next = next.add(const Duration(days: 7));
-//     } else {
-//       next = next.add(Duration(days: daysUntilNext));
-//     }
-
-//     return next;
-//   }
-
-//   List<int> _parseRepeatDays(String repeatDays) {
-//     try {
-//       // Parse JSON array string like "[1,3,5]"
-//       final cleaned = repeatDays.replaceAll('[', '').replaceAll(']', '');
-//       return cleaned.split(',').map((e) => int.parse(e.trim())).toList();
-//     } catch (e) {
-//       return [];
-//     }
-//   }
-
-//   Future<void> cancelNotification(int notificationId) async {
-//     await _notifications.cancel(notificationId);
-//   }
-
-//   Future<void> cancelAllNotifications() async {
-//     await _notifications.cancelAll();
-//   }
-
-//   Future<void> updateTaskNotification(Task task) async {
-//     await _ensureInitialized();
-    
-//     if (task.notificationId != null) {
-//       await cancelNotification(task.notificationId!);
-//     }
-//     if (!task.isCompleted) {
-//       await scheduleTaskNotification(task);
-//     }
-//   }
-// }
-
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'dart:developer' as developer;
 import '../models/task.dart';
 
 class NotificationService {
   static final NotificationService instance = NotificationService._init();
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
 
   NotificationService._init();
 
   Future<void> _ensureInitialized() async {
     if (_isInitialized) return;
-    
+
     tz.initializeTimeZones();
     final location = tz.local;
     tz.setLocalLocation(location);
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    developer.log(
+      '🌍 Timezone initialized: $location',
+      name: 'notification_service',
+    );
+
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -319,57 +46,205 @@ class NotificationService {
 
     await _requestPermissions();
     _isInitialized = true;
+    developer.log(
+      '✅ NotificationService initialized',
+      name: 'notification_service',
+    );
   }
 
   Future<void> _requestPermissions() async {
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
     if (androidPlugin != null) {
-      await androidPlugin.requestNotificationsPermission();
+      // Request notification permission
+      final notifEnabled = await androidPlugin.areNotificationsEnabled();
+      developer.log(
+        '📬 Notifications enabled: $notifEnabled',
+        name: 'notification_service',
+      );
+
+      if (notifEnabled == false) {
+        final granted = await androidPlugin.requestNotificationsPermission();
+        developer.log(
+          '📬 Notification permission granted: $granted',
+          name: 'notification_service',
+        );
+      }
+
       // Request exact alarm permission for Android 12+
-      await androidPlugin.requestExactAlarmsPermission();
+      try {
+        final canSchedule = await androidPlugin.canScheduleExactNotifications();
+        developer.log(
+          '⏰ Can schedule exact alarms: $canSchedule',
+          name: 'notification_service',
+        );
+
+        if (canSchedule == false) {
+          final granted = await androidPlugin.requestExactAlarmsPermission();
+          developer.log(
+            '⏰ Exact alarm permission granted: $granted',
+            name: 'notification_service',
+          );
+        }
+      } catch (e) {
+        developer.log(
+          '⚠️ Exact alarm permission check failed: $e',
+          name: 'notification_service',
+        );
+      }
     }
   }
 
   void _onNotificationTapped(NotificationResponse response) {
-    // Handle notification tap
+    developer.log(
+      '🔔 Notification tapped: ${response.id}',
+      name: 'notification_service',
+    );
   }
 
-  // Schedule 1-minute reminder
-  Future<void> _scheduleOneMinuteReminder(Task task, DateTime dueDateTime, int notificationId) async {
-    final now = DateTime.now();
-    if (dueDateTime.isBefore(now)) return;
-
-    final reminderTime = dueDateTime.subtract(const Duration(minutes: 1));
-    if (reminderTime.isBefore(now)) return;
-
-    final androidDetails = AndroidNotificationDetails(
-      'task_urgent_reminder_channel',
-      'Urgent Task Reminders',
-      channelDescription: 'Critical reminders for tasks due in 1 minute',
-      importance: Importance.max,
-      priority: Priority.max,
+  // Create notification details with MAXIMUM visibility
+  AndroidNotificationDetails _createAndroidDetails({
+    required String channelId,
+    required String channelName,
+    required String channelDescription,
+    required Importance importance,
+    required Priority priority,
+    Color? ledColor,
+    bool isUrgent = false,
+  }) {
+    return AndroidNotificationDetails(
+      channelId,
+      channelName,
+      channelDescription: channelDescription,
+      importance: importance,
+      priority: priority,
       icon: '@mipmap/ic_launcher',
+
+      // SOUND & VIBRATION
       enableVibration: true,
       playSound: true,
-      sound: RawResourceAndroidNotificationSound('notification_sound'),
+
+      // VISIBILITY - These make it show on lock screen and as heads-up
       visibility: NotificationVisibility.public,
+      category: isUrgent
+          ? AndroidNotificationCategory.alarm
+          : AndroidNotificationCategory.reminder,
+
+      // HEADS-UP NOTIFICATION (pop-up on screen)
       fullScreenIntent: true,
-      category: AndroidNotificationCategory.alarm,
-      autoCancel: false,
+
+      // LOCK SCREEN
+      showWhen: true,
+      when: DateTime.now().millisecondsSinceEpoch,
+
+      // PERSISTENT
       ongoing: false,
-      channelShowBadge: true,
+      autoCancel: true,
+
+      // LED
       enableLights: true,
-      ledColor: Colors.red,
+      ledColor: ledColor ?? Colors.blue,
       ledOnMs: 1000,
       ledOffMs: 500,
+
+      // BADGE
+      channelShowBadge: true,
+      number: 1,
+
+      // STYLE - Makes notification expandable
+      styleInformation: BigTextStyleInformation(
+        '',
+        htmlFormatBigText: true,
+        contentTitle: '',
+        htmlFormatContentTitle: true,
+        summaryText: 'Tap to open',
+        htmlFormatSummaryText: true,
+      ),
+
+      // TICKER - Shows on status bar
+      ticker: 'Task Reminder',
+    );
+  }
+
+  // TEST FUNCTION - Call this first to verify notifications work
+  Future<void> testImmediateNotification() async {
+    await _ensureInitialized();
+
+    developer.log(
+      '🔔 Testing immediate notification...',
+      name: 'notification_service',
+    );
+
+    final androidDetails = _createAndroidDetails(
+      channelId: 'test_channel',
+      channelName: 'Test Notifications',
+      channelDescription: 'Testing notification system',
+      importance: Importance.max,
+      priority: Priority.max,
+      ledColor: Colors.green,
+      isUrgent: true,
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
-      sound: 'notification_sound.aiff',
+      interruptionLevel: InterruptionLevel.critical,
+    );
+
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _notifications.show(
+      999,
+      'Test Notification ✅',
+      'If you see this as pop-up, everything works! Lock your phone and check lock screen too.',
+      notificationDetails,
+    );
+
+    developer.log(
+      '✅ Immediate notification sent with ID: 999',
+      name: 'notification_service',
+    );
+  }
+
+  // TEST FUNCTION - Test scheduled notification (30 seconds)
+  Future<void> test30SecondNotification() async {
+    await _ensureInitialized();
+
+    developer.log(
+      '⏰ Scheduling notification for 30 seconds from now...',
+      name: 'notification_service',
+    );
+
+    final now = tz.TZDateTime.now(tz.local);
+    final scheduledDate = now.add(const Duration(seconds: 30));
+
+    developer.log('📅 Current time: $now', name: 'notification_service');
+    developer.log(
+      '📅 Scheduled time: $scheduledDate',
+      name: 'notification_service',
+    );
+
+    final androidDetails = _createAndroidDetails(
+      channelId: 'test_scheduled_channel',
+      channelName: 'Test Scheduled Notifications',
+      channelDescription: 'Testing scheduled notifications',
+      importance: Importance.max,
+      priority: Priority.max,
+      ledColor: Colors.orange,
+      isUrgent: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
       interruptionLevel: InterruptionLevel.critical,
     );
 
@@ -379,7 +254,98 @@ class NotificationService {
     );
 
     await _notifications.zonedSchedule(
-      notificationId + 2000, // Different ID for 1-minute reminder
+      888,
+      '30 Second Test ⏰',
+      'This should appear as pop-up and on lock screen! Scheduled 30 seconds ago.',
+      scheduledDate,
+      notificationDetails,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+
+    developer.log(
+      '✅ 30-second notification scheduled with ID: 888',
+      name: 'notification_service',
+    );
+    await listPendingNotifications();
+  }
+
+  // DEBUG FUNCTION - List all pending notifications
+  Future<void> listPendingNotifications() async {
+    final pending = await _notifications.pendingNotificationRequests();
+    developer.log(
+      '📋 Pending notifications: ${pending.length}',
+      name: 'notification_service',
+    );
+
+    for (final notification in pending) {
+      developer.log(
+        '  ID: ${notification.id} | Title: ${notification.title}',
+        name: 'notification_service',
+      );
+    }
+
+    if (pending.isEmpty) {
+      developer.log(
+        '⚠️ WARNING: No pending notifications found!',
+        name: 'notification_service',
+      );
+    }
+  }
+
+  Future<void> _scheduleOneMinuteReminder(
+    Task task,
+    DateTime dueDateTime,
+    int notificationId,
+  ) async {
+    final now = DateTime.now();
+    if (dueDateTime.isBefore(now)) {
+      developer.log(
+        '⚠️ Due time is in the past, skipping 1-min reminder',
+        name: 'notification_service',
+      );
+      return;
+    }
+
+    final reminderTime = dueDateTime.subtract(const Duration(minutes: 1));
+    if (reminderTime.isBefore(now)) {
+      developer.log(
+        '⚠️ 1-min reminder time is in the past, skipping',
+        name: 'notification_service',
+      );
+      return;
+    }
+
+    developer.log(
+      '⏰ Scheduling 1-min reminder for: $reminderTime',
+      name: 'notification_service',
+    );
+
+    final androidDetails = _createAndroidDetails(
+      channelId: 'task_urgent_reminder_channel',
+      channelName: 'Urgent Task Reminders',
+      channelDescription: 'Critical reminders for tasks due in 1 minute',
+      importance: Importance.max,
+      priority: Priority.max,
+      ledColor: Colors.red,
+      isUrgent: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.critical,
+    );
+
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _notifications.zonedSchedule(
+      notificationId + 2000,
       '🚨 URGENT: 1 Minute Left!',
       '${task.title} - Complete now!',
       tz.TZDateTime.from(reminderTime, tz.local),
@@ -388,43 +354,51 @@ class NotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
+
+    developer.log(
+      '✅ 1-min reminder scheduled with ID: ${notificationId + 2000}',
+      name: 'notification_service',
+    );
   }
 
-  // Schedule 5-minute reminder
-  Future<void> _scheduleFiveMinuteReminder(Task task, DateTime dueDateTime, int notificationId) async {
+  Future<void> _scheduleFiveMinuteReminder(
+    Task task,
+    DateTime dueDateTime,
+    int notificationId,
+  ) async {
     final now = DateTime.now();
-    if (dueDateTime.isBefore(now)) return;
+    if (dueDateTime.isBefore(now)) {
+      developer.log('⚠️ Due time is in the past, skipping 5-min reminder');
+      return;
+    }
 
     final reminderTime = dueDateTime.subtract(const Duration(minutes: 5));
-    if (reminderTime.isBefore(now)) return;
+    if (reminderTime.isBefore(now)) {
+      developer.log(
+        '⚠️ 5-min reminder time is in the past, skipping',
+        name: 'notification_service',
+      );
+      return;
+    }
 
-    final androidDetails = AndroidNotificationDetails(
-      'task_reminder_channel',
-      'Task Reminders',
+    developer.log(
+      '⏰ Scheduling 5-min reminder for: $reminderTime',
+      name: 'notification_service',
+    );
+
+    final androidDetails = _createAndroidDetails(
+      channelId: 'task_reminder_channel',
+      channelName: 'Task Reminders',
       channelDescription: 'Important reminders for tasks due in 5 minutes',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
-      enableVibration: true,
-      playSound: true,
-      sound: RawResourceAndroidNotificationSound('notification_sound'),
-      visibility: NotificationVisibility.public,
-      fullScreenIntent: true,
-      category: AndroidNotificationCategory.reminder,
-      autoCancel: false,
-      ongoing: false,
-      channelShowBadge: true,
-      enableLights: true,
       ledColor: Colors.orange,
-      ledOnMs: 1000,
-      ledOffMs: 500,
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
-      sound: 'notification_sound.aiff',
       interruptionLevel: InterruptionLevel.timeSensitive,
     );
 
@@ -434,7 +408,7 @@ class NotificationService {
     );
 
     await _notifications.zonedSchedule(
-      notificationId + 1000, // Different ID for 5-minute reminder
+      notificationId + 1000,
       '⚠️ Task Due in 5 Minutes!',
       '${task.title} - ${task.description.isEmpty ? "Don't forget!" : task.description}',
       tz.TZDateTime.from(reminderTime, tz.local),
@@ -443,56 +417,72 @@ class NotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
+
+    developer.log(
+      '✅ 5-min reminder scheduled with ID: ${notificationId + 1000}',
+      name: 'notification_service',
+    );
   }
 
   Future<void> scheduleTaskNotification(Task task) async {
     await _ensureInitialized();
-    
+
     try {
+      developer.log(
+        '📱 === Scheduling notification for task: ${task.title} ===',
+        name: 'notification_service',
+      );
+
       if (task.dueDate.isBefore(DateTime.now()) && task.repeatType == 'none') {
+        developer.log(
+          '⚠️ Task due date is in the past and not repeating, skipping',
+          name: 'notification_service',
+        );
         return;
       }
 
       final notificationId = task.notificationId ?? (task.id ?? 0);
-      final dueDateTime = task.dueTime ?? DateTime(
-        task.dueDate.year,
-        task.dueDate.month,
-        task.dueDate.day,
-        9,
+      final dueDateTime =
+          task.dueTime ??
+          DateTime(
+            task.dueDate.year,
+            task.dueDate.month,
+            task.dueDate.day,
+            9,
+            0,
+          );
+
+      developer.log(
+        '📅 Due date/time: $dueDateTime',
+        name: 'notification_service',
+      );
+      developer.log(
+        '🆔 Notification ID: $notificationId',
+        name: 'notification_service',
+      );
+      developer.log(
+        '🔁 Repeat type: ${task.repeatType}',
+        name: 'notification_service',
       );
 
-      // Schedule both reminder notifications
+      // Schedule reminder notifications
       await _scheduleFiveMinuteReminder(task, dueDateTime, notificationId);
       await _scheduleOneMinuteReminder(task, dueDateTime, notificationId);
 
-      // Main notification settings with maximum priority
-      final androidDetails = AndroidNotificationDetails(
-        'task_channel',
-        'Task Notifications',
+      // Main notification with maximum visibility
+      final androidDetails = _createAndroidDetails(
+        channelId: 'task_channel',
+        channelName: 'Task Notifications',
         channelDescription: 'Notifications for upcoming tasks',
         importance: Importance.max,
         priority: Priority.max,
-        icon: '@mipmap/ic_launcher',
-        enableVibration: true,
-        playSound: true,
-        sound: RawResourceAndroidNotificationSound('notification_sound'),
-        visibility: NotificationVisibility.public,
-        fullScreenIntent: true,
-        category: AndroidNotificationCategory.event,
-        autoCancel: false,
-        ongoing: false,
-        channelShowBadge: true,
-        enableLights: true,
         ledColor: Colors.green,
-        ledOnMs: 1000,
-        ledOffMs: 500,
       );
 
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
-        sound: 'notification_sound.aiff',
         interruptionLevel: InterruptionLevel.timeSensitive,
       );
 
@@ -503,6 +493,16 @@ class NotificationService {
 
       final now = tz.TZDateTime.now(tz.local);
       final scheduledDate = tz.TZDateTime.from(dueDateTime, tz.local);
+
+      developer.log('📅 Current TZ time: $now', name: 'notification_service');
+      developer.log(
+        '📅 Scheduled TZ time: $scheduledDate',
+        name: 'notification_service',
+      );
+      developer.log(
+        '📅 Is scheduled time in future? ${scheduledDate.isAfter(now)}',
+        name: 'notification_service',
+      );
 
       if (task.repeatType == 'daily') {
         var nextDate = scheduledDate;
@@ -516,7 +516,12 @@ class NotificationService {
             scheduledDate.minute,
           ).add(const Duration(days: 1));
         }
-        
+
+        developer.log(
+          '📅 Daily task - next occurrence: $nextDate',
+          name: 'notification_service',
+        );
+
         await _notifications.zonedSchedule(
           notificationId,
           '📅 ${task.title}',
@@ -527,8 +532,18 @@ class NotificationService {
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
         );
+
+        developer.log(
+          '✅ Daily notification scheduled with ID: $notificationId',
+          name: 'notification_service',
+        );
       } else if (task.repeatType == 'weekly' && task.repeatDays != null) {
+        developer.log(
+          '📅 Weekly task - scheduling for days: ${task.repeatDays}',
+          name: 'notification_service',
+        );
         final days = _parseRepeatDays(task.repeatDays!);
+
         for (final day in days) {
           await _scheduleWeeklyNotification(
             notificationId + day,
@@ -539,6 +554,7 @@ class NotificationService {
           );
         }
       } else {
+        // One-time notification
         if (scheduledDate.isAfter(now)) {
           await _notifications.zonedSchedule(
             notificationId,
@@ -550,9 +566,32 @@ class NotificationService {
             uiLocalNotificationDateInterpretation:
                 UILocalNotificationDateInterpretation.absoluteTime,
           );
+
+          developer.log(
+            '✅ One-time notification scheduled with ID: $notificationId',
+            name: 'notification_service',
+          );
+        } else {
+          developer.log(
+            '⚠️ Scheduled time is in the past, skipping main notification',
+            name: 'notification_service',
+          );
         }
       }
+
+      // List all pending notifications after scheduling
+      await listPendingNotifications();
+
+      developer.log(
+        '📱 === Notification scheduling complete ===',
+        name: 'notification_service',
+      );
     } catch (e) {
+      developer.log(
+        '❌ ERROR scheduling notification',
+        name: 'notification_service',
+        error: e,
+      );
       rethrow;
     }
   }
@@ -567,6 +606,11 @@ class NotificationService {
     final now = tz.TZDateTime.now(tz.local);
     final scheduledDate = _getNextWeekday(now, dayOfWeek, dueDateTime);
 
+    developer.log(
+      '📅 Weekly notification for day $dayOfWeek: $scheduledDate',
+      name: 'notification_service',
+    );
+
     if (scheduledDate.isAfter(now)) {
       await _notifications.zonedSchedule(
         id,
@@ -579,10 +623,19 @@ class NotificationService {
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
+
+      developer.log(
+        '✅ Weekly notification scheduled with ID: $id',
+        name: 'notification_service',
+      );
     }
   }
 
-  tz.TZDateTime _getNextWeekday(tz.TZDateTime now, int dayOfWeek, DateTime dueTime) {
+  tz.TZDateTime _getNextWeekday(
+    tz.TZDateTime now,
+    int dayOfWeek,
+    DateTime dueTime,
+  ) {
     var next = tz.TZDateTime(
       tz.local,
       now.year,
@@ -594,7 +647,7 @@ class NotificationService {
 
     final currentDay = now.weekday;
     final daysUntilNext = (dayOfWeek - currentDay) % 7;
-    
+
     if (daysUntilNext == 0 && next.isBefore(now)) {
       next = next.add(const Duration(days: 7));
     } else {
@@ -609,24 +662,36 @@ class NotificationService {
       final cleaned = repeatDays.replaceAll('[', '').replaceAll(']', '');
       return cleaned.split(',').map((e) => int.parse(e.trim())).toList();
     } catch (e) {
+      developer.log(
+        '❌ Error parsing repeat days',
+        name: 'notification_service',
+        error: e,
+      );
       return [];
     }
   }
 
   Future<void> cancelNotification(int notificationId) async {
+    developer.log(
+      '🗑️ Cancelling notification ID: $notificationId',
+      name: 'notification_service',
+    );
     await _notifications.cancel(notificationId);
-    // Also cancel reminder notifications
     await _notifications.cancel(notificationId + 1000); // 5-min reminder
     await _notifications.cancel(notificationId + 2000); // 1-min reminder
   }
 
   Future<void> cancelAllNotifications() async {
+    developer.log(
+      '🗑️ Cancelling all notifications',
+      name: 'notification_service',
+    );
     await _notifications.cancelAll();
   }
 
   Future<void> updateTaskNotification(Task task) async {
     await _ensureInitialized();
-    
+
     if (task.notificationId != null) {
       await cancelNotification(task.notificationId!);
     }
